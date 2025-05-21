@@ -1,0 +1,7 @@
+try:
+    from importlib.metadata import version
+
+    __version__ = version("tadata-sdk")
+except Exception:  # pragma: no cover
+    # Fallback for local development
+    __version__ = "0.0.0.dev0"  # pragma: no cover
