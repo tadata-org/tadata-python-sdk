@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Dict, Literal, Optional, Protocol
+from typing import Any, Dict, Literal, Optional
+from typing_extensions import Annotated, Doc
 
 import httpx
 
@@ -7,24 +8,7 @@ from ..errors.exceptions import ApiError, AuthError, NetworkError
 from .schemas import DeploymentResponse, UpsertDeploymentRequest
 
 
-class Logger(Protocol):
-    """Logger protocol for dependency injection."""
-
-    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
-        """Log a debug message."""
-        ...
-
-    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
-        """Log an info message."""
-        ...
-
-    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
-        """Log a warning message."""
-        ...
-
-    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
-        """Log an error message."""
-        ...
+logger = logging.getLogger(__name__)
 
 
 class ApiClient:
@@ -36,27 +20,14 @@ class ApiClient:
 
     def __init__(
         self,
-        api_key: str,
-        base_url: str = "https://api.tadata.com",
-        version: Literal["05-2025", "latest"] = "latest",
-        timeout: int = 30,
-        logger: Optional[Logger] = None,
+        api_key: Annotated[str, Doc("The Tadata API key for authentication")],
+        version: Annotated[Literal["05-2025", "latest"], Doc("The API version to use")] = "latest",
+        timeout: Annotated[int, Doc("Request timeout in seconds")] = 30,
     ) -> None:
-        """Initialize a new API client.
-
-        Args:
-            api_key: The Tadata API key for authentication.
-            base_url: The base URL of the Tadata API.
-            version: The API version to use.
-            timeout: Request timeout in seconds.
-            logger: Optional logger to use for API client logs. If not provided,
-                a default logger will be created.
-        """
         self.api_key = api_key
-        self.base_url = base_url.rstrip("/")
+        self.base_url = "https://api.tadata.com"
         self.version = version
         self.timeout = timeout
-        self.logger = logger or logging.getLogger("tadata_sdk.http.client")
 
         self.client = httpx.Client(
             timeout=timeout,
@@ -77,7 +48,7 @@ class ApiClient:
         Raises:
             NetworkError: For network-related errors.
         """
-        self.logger.error(f"Request error: {error}")
+        logger.error(f"Request error: {error}")
         raise NetworkError(f"{message}: {str(error)}", cause=error)
 
     def _handle_response_error(self, response: httpx.Response) -> None:
@@ -103,10 +74,10 @@ class ApiClient:
             error_msg = f"API error: {status_code}"
 
         if status_code in (401, 403):
-            self.logger.error(f"Authentication error: {status_code}")
+            logger.error(f"Authentication error: {status_code}")
             raise AuthError(error_msg, cause=Exception(str(error_data)))
 
-        self.logger.error(f"API error: {status_code} - {error_msg}")
+        logger.error(f"API error: {status_code} - {error_msg}")
         raise ApiError(error_msg, status_code, error_data)
 
     def _request(
@@ -139,7 +110,7 @@ class ApiClient:
         request_params["apiKey"] = self.api_key
         request_headers = {} if headers is None else headers.copy()
 
-        self.logger.debug(f"Making request: {method} {url}")
+        logger.debug(f"Making request: {method} {url}")
 
         try:
             if data is not None:
@@ -177,7 +148,7 @@ class ApiClient:
             AuthError: For authentication errors.
             ApiError: For API errors.
         """
-        self.logger.info("Deploying MCP server from OpenAPI spec")
+        logger.info("Deploying MCP server from OpenAPI spec")
 
         response = self._request("POST", "/api/deployments/from-openapi", data=request.model_dump(by_alias=True))
 
@@ -185,7 +156,7 @@ class ApiClient:
             result = DeploymentResponse.model_validate(response.json())
             return result
         except Exception as e:
-            self.logger.error(f"Failed to parse deployment response: {e}")
+            logger.error(f"Failed to parse deployment response: {e}")
             raise ApiError(
                 "Failed to parse deployment response",
                 response.status_code,

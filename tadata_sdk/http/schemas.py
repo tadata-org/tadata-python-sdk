@@ -49,7 +49,7 @@ class ApiResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class MCPAuthConfig(BaseModel):
+class AuthConfig(BaseModel):
     """Configuration for MCP authentication handling."""
 
     pass_headers: List[str] = Field(
@@ -83,8 +83,8 @@ class UpsertDeploymentRequest(BaseModel):
     open_api_spec: OpenAPISpec = Field(..., description="The OpenAPI specification")
     name: Optional[str] = Field(None, description="Optional name for the deployment")
     base_url: Optional[str] = Field(None, description="Base URL of the API to proxy requests to")
-    auth_config: MCPAuthConfig = Field(
-        default_factory=MCPAuthConfig,
+    auth_config: AuthConfig = Field(
+        default_factory=AuthConfig,
         description="Configuration for authentication handling",
     )
 

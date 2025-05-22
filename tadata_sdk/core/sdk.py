@@ -1,14 +1,18 @@
 """Core SDK functionality for the Tadata Platform."""
 
+import logging
 import urllib.parse
 from datetime import datetime
 from typing import Any, Dict, Literal, Optional, Union, overload
+from typing_extensions import Annotated, Doc
 
 from ..errors.exceptions import SpecInvalidError
-from ..http.client import ApiClient, Logger
-from ..http.schemas import DeploymentResponse, MCPAuthConfig, UpsertDeploymentRequest
+from ..http.client import ApiClient
+from ..http.schemas import DeploymentResponse, AuthConfig, UpsertDeploymentRequest
 from ..openapi.source import OpenAPISpec
-from .logger import create_default_logger
+
+
+logger = logging.getLogger(__name__)
 
 
 class DeploymentResult:
@@ -40,12 +44,9 @@ def deploy(
     api_key: str,
     base_url: Optional[str] = None,
     name: Optional[str] = None,
-    auth_config: Optional[Dict[str, Any]] = None,
-    api_base_url: str = "https://api.tadata.com",
+    auth_config: Optional[AuthConfig] = None,
     api_version: Literal["05-2025", "latest"] = "latest",
     timeout: int = 30,
-    logger: Optional[Logger] = None,
-    dev: bool = False,
 ) -> DeploymentResult: ...
 
 
@@ -56,12 +57,9 @@ def deploy(
     api_key: str,
     base_url: Optional[str] = None,
     name: Optional[str] = None,
-    auth_config: Optional[Dict[str, Any]] = None,
-    api_base_url: str = "https://api.tadata.com",
+    auth_config: Optional[AuthConfig] = None,
     api_version: Literal["05-2025", "latest"] = "latest",
     timeout: int = 30,
-    logger: Optional[Logger] = None,
-    dev: bool = False,
 ) -> DeploymentResult: ...
 
 
@@ -72,48 +70,34 @@ def deploy(
     api_key: str,
     base_url: Optional[str] = None,
     name: Optional[str] = None,
-    auth_config: Optional[Dict[str, Any]] = None,
-    api_base_url: str = "https://api.tadata.com",
+    auth_config: Optional[AuthConfig] = None,
     api_version: Literal["05-2025", "latest"] = "latest",
     timeout: int = 30,
-    logger: Optional[Logger] = None,
-    dev: bool = False,
 ) -> DeploymentResult: ...
 
 
 def deploy(
     *,
-    openapi_spec_path: Optional[str] = None,
-    openapi_spec_url: Optional[str] = None,
-    openapi_spec: Optional[Union[Dict[str, Any], OpenAPISpec]] = None,
-    base_url: Optional[str] = None,
-    name: Optional[str] = None,
-    auth_config: Optional[Dict[str, Any]] = None,
-    api_key: str,
-    api_base_url: str = "https://api.tadata.com",
-    api_version: Literal["05-2025", "latest"] = "latest",
-    timeout: int = 30,
-    logger: Optional[Logger] = None,
-    dev: bool = False,
+    openapi_spec_path: Annotated[Optional[str], Doc("Path to an OpenAPI specification file (JSON or YAML)")] = None,
+    openapi_spec_url: Annotated[Optional[str], Doc("URL to an OpenAPI specification")] = None,
+    openapi_spec: Annotated[
+        Optional[Union[Dict[str, Any], OpenAPISpec]], Doc("OpenAPI specification as a dictionary or OpenAPISpec object")
+    ] = None,
+    base_url: Annotated[
+        Optional[str],
+        Doc("Base URL of the API to proxy requests to. If not provided, will try to extract from the OpenAPI spec"),
+    ] = None,
+    name: Annotated[Optional[str], Doc("Optional name for the deployment")] = None,
+    auth_config: Annotated[
+        Optional[AuthConfig], Doc("Configuration for authentication handling between the MCP and your API")
+    ] = None,
+    api_key: Annotated[str, Doc("Tadata API key for authentication")],
+    api_version: Annotated[Literal["05-2025", "latest"], Doc("Tadata API version")] = "latest",
+    timeout: Annotated[int, Doc("Request timeout in seconds")] = 30,
 ) -> DeploymentResult:
     """Deploy a Model Context Protocol (MCP) server from an OpenAPI specification.
 
     You must provide exactly one of: openapi_spec_path, openapi_spec_url, or openapi_spec.
-
-    Args:
-        openapi_spec_path: Path to an OpenAPI specification file (JSON or YAML).
-        openapi_spec_url: URL to an OpenAPI specification.
-        openapi_spec: OpenAPI specification as a dictionary or OpenAPISpec object.
-        base_url: Base URL of the API to proxy requests to. If not provided, will try to extract
-            from the OpenAPI spec.
-        name: Optional name for the deployment.
-        auth_config: Configuration for authentication handling.
-        api_key: Tadata API key for authentication.
-        api_base_url: Tadata API base URL. Defaults to production API.
-        api_version: Tadata API version.
-        timeout: Request timeout in seconds.
-        logger: Optional logger to use for SDK logs.
-        dev: Whether to use the development environment.
 
     Returns:
         A DeploymentResult object containing details of the deployment.
@@ -125,13 +109,7 @@ def deploy(
         ApiError: If the Tadata API returns an error.
         NetworkError: If a network error occurs.
     """
-    # Set up logger
-    log = logger or create_default_logger()
-    log.info("Deploying MCP server from OpenAPI spec")
-
-    # Use development API if requested
-    if dev:
-        api_base_url = "https://api.stage.tadata.com"
+    logger.info("Deploying MCP server from OpenAPI spec")
 
     # Validate input - must have exactly one openapi_spec source
     source_count = sum(1 for x in [openapi_spec_path, openapi_spec_url, openapi_spec] if x is not None)
@@ -143,10 +121,10 @@ def deploy(
     # Process OpenAPI spec from the provided source
     spec: Optional[OpenAPISpec] = None
     if openapi_spec_path is not None:
-        log.info(f"Loading OpenAPI spec from file: {openapi_spec_path}")
+        logger.info(f"Loading OpenAPI spec from file: {openapi_spec_path}")
         spec = OpenAPISpec.from_file(openapi_spec_path)
     elif openapi_spec_url is not None:
-        log.info(f"Loading OpenAPI spec from URL: {openapi_spec_url}")
+        logger.info(f"Loading OpenAPI spec from URL: {openapi_spec_url}")
         # We'll use httpx to fetch the URL
         import httpx
 
@@ -177,11 +155,11 @@ def deploy(
                 cause=e,
             )
     elif isinstance(openapi_spec, dict):
-        log.info("Using provided OpenAPI spec dictionary")
+        logger.info("Using provided OpenAPI spec dictionary")
         spec = OpenAPISpec.from_dict(openapi_spec)
     elif openapi_spec is not None:
         # Must be OpenAPISpec instance
-        log.info("Using provided OpenAPISpec instance")
+        logger.info("Using provided OpenAPISpec instance")
         spec = openapi_spec
 
     # At this point, spec should be defined
@@ -189,18 +167,15 @@ def deploy(
         # This should never happen due to our validation above, but make type checker happy
         raise ValueError("Unable to obtain OpenAPI specification from provided sources")
 
-    # Process auth config
-    mcp_auth_config = MCPAuthConfig()
+    mcp_auth_config = AuthConfig()
     if auth_config is not None:
-        mcp_auth_config = MCPAuthConfig.model_validate(auth_config)
+        mcp_auth_config = AuthConfig.model_validate(auth_config.model_dump())
 
     # Create API client
     client = ApiClient(
         api_key=api_key,
-        base_url=api_base_url,
         version=api_version,
         timeout=timeout,
-        logger=log,
     )
 
     # Create deployment request
