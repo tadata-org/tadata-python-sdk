@@ -15,6 +15,8 @@ class OpenAPIInfo(BaseModel):
     version: str
     description: Optional[str] = None
 
+    model_config = ConfigDict(populate_by_name=True)
+
 
 class OpenAPISpec(BaseModel):
     """Represents a validated OpenAPI specification.
@@ -26,7 +28,7 @@ class OpenAPISpec(BaseModel):
     openapi: str = Field(..., description="OpenAPI version string")
     info: OpenAPIInfo = Field(..., description="Information about the API")
     paths: Dict[str, Any] = Field(..., description="API paths")
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     @field_validator("openapi")
     @classmethod

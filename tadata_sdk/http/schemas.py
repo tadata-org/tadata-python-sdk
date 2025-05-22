@@ -62,44 +62,53 @@ class AuthConfig(BaseModel):
             "x-apikey",
         ],
         description="Headers to pass through from MCP clients to the upstream API",
+        alias="passHeaders",
     )
     pass_query_params: List[str] = Field(
         default=["api-key", "api_key", "apikey"],
         description="Query parameters to pass through from MCP clients to the upstream API",
+        alias="passQueryParams",
     )
     pass_json_body_params: List[str] = Field(
         default=[],
         description="JSON body parameters to extract and pass to the upstream API",
+        alias="passJsonBodyParams",
     )
     pass_form_data_params: List[str] = Field(
         default=[],
         description="Form data parameters to extract and pass to the upstream API",
+        alias="passFormDataParams",
     )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class UpsertDeploymentRequest(BaseModel):
     """Request to deploy or update an MCP server."""
 
-    open_api_spec: OpenAPISpec = Field(..., description="The OpenAPI specification")
+    open_api_spec: OpenAPISpec = Field(..., description="The OpenAPI specification", alias="openApiSpec")
     name: Optional[str] = Field(None, description="Optional name for the deployment")
-    base_url: Optional[str] = Field(None, description="Base URL of the API to proxy requests to")
+    base_url: Optional[str] = Field(None, description="Base URL of the API to proxy requests to", alias="baseUrl")
     auth_config: AuthConfig = Field(
-        default_factory=AuthConfig,
-        description="Configuration for authentication handling",
+        default_factory=AuthConfig, description="Configuration for authentication handling", alias="authConfig"
     )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class DeploymentResponseData(BaseModel):
     """Deployment data in a successful response."""
 
     id: str
-    created_at: Optional[datetime] = None
-    created_by: str
-    updated_by: str
-    mcp_server_id: str
-    open_api_spec_hash: str
-    mcp_spec_hash: str
-    status: str
+    created_at: Optional[datetime] = Field(None, alias="createdAt")
+    created_by: Optional[str] = Field(None, alias="createdBy")
+    updated_by: Optional[str] = Field(None, alias="updatedBy")
+    mcp_server_id: Optional[str] = Field(None, alias="mcpServerId")
+    open_api_spec_hash: Optional[str] = Field(None, alias="openAPISpecHash")
+    mcp_spec_hash: Optional[str] = Field(None, alias="mcpSpecHash")
+    status: Optional[str] = Field(None)
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 
 class UpsertDeploymentResponseData(BaseModel):
@@ -107,6 +116,8 @@ class UpsertDeploymentResponseData(BaseModel):
 
     updated: bool
     deployment: DeploymentResponseData
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class DeploymentResponse(ApiResponse):

@@ -77,7 +77,7 @@ class ApiClient:
             logger.error(f"Authentication error: {status_code}")
             raise AuthError(error_msg, cause=Exception(str(error_data)))
 
-        logger.error(f"API error: {status_code} - {error_msg}")
+        logger.error(f"API error: {status_code} - {error_msg}\n{error_data}")
         raise ApiError(error_msg, status_code, error_data)
 
     def _request(
@@ -150,7 +150,9 @@ class ApiClient:
         """
         logger.info("Deploying MCP server from OpenAPI spec")
 
-        response = self._request("POST", "/api/deployments/from-openapi", data=request.model_dump(by_alias=True))
+        response = self._request(
+            "POST", "/api/deployments/from-openapi", data=request.model_dump(by_alias=True, exclude_none=True)
+        )
 
         try:
             result = DeploymentResponse.model_validate(response.json())

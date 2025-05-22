@@ -36,6 +36,10 @@ class DeploymentResult:
         self.updated = data.updated
         self.created_at = data.deployment.created_at or datetime.now()
 
+    def __str__(self) -> str:
+        """Return a string representation of the deployment result."""
+        return f"DeploymentResult(id={self.id}, updated={self.updated}, created_at={self.created_at})"
+
 
 @overload
 def deploy(
@@ -171,23 +175,28 @@ def deploy(
     if auth_config is not None:
         mcp_auth_config = AuthConfig.model_validate(auth_config.model_dump())
 
-    # Create API client
     client = ApiClient(
         api_key=api_key,
         version=api_version,
         timeout=timeout,
     )
 
-    # Create deployment request
     request = UpsertDeploymentRequest(
-        open_api_spec=spec,
+        openApiSpec=spec,
         name=name,
-        base_url=base_url,
-        auth_config=mcp_auth_config,
+        baseUrl=base_url,
+        authConfig=mcp_auth_config,
     )
 
-    # Make API request to deploy
     api_response: DeploymentResponse = client.deploy_from_openapi(request)
 
-    # Process response
-    return DeploymentResult(api_response)
+    result = DeploymentResult(api_response)
+
+    logger.info(f"Deployment successful - ID: {result.id}")
+
+    if result.updated:
+        logger.info("New deployment was created")
+    else:
+        logger.info("No changes in spec, deployment was skipped")
+
+    return result

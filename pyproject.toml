@@ -37,6 +37,7 @@ dev = [
     "pytest-cov>=6.1.1",
     "pre-commit>=4.2.0",
     "types-pyyaml>=6.0.12.20250516",
+    "pip>=25.1.1",
 ]
 
 [project.urls]
@@ -48,7 +49,7 @@ Documentation = "https://github.com/tadata-org/tadata-python-sdk#readme"
 "Changelog" = "https://github.com/tadata-org/tadata-python-sdk/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
-packages = ["tadata_python_sdk"]
+packages = ["tadata_sdk"]
 
 [tool.ruff]
 line-length = 120
