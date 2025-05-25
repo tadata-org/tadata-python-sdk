@@ -38,6 +38,7 @@ dev = [
     "pre-commit>=4.2.0",
     "types-pyyaml>=6.0.12.20250516",
     "pip>=25.1.1",
+    "fastapi>=0.115.12",
 ]
 
 [project.urls]

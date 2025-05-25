@@ -3,8 +3,13 @@
 import logging
 import urllib.parse
 from datetime import datetime
-from typing import Any, Dict, Literal, Optional, Union, overload
+from typing import Any, Dict, Literal, Optional, Union, overload, TYPE_CHECKING
 from typing_extensions import Annotated, Doc
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+else:
+    FastAPI = Any
 
 from ..errors.exceptions import SpecInvalidError
 from ..http.client import ApiClient
@@ -80,6 +85,19 @@ def deploy(
 ) -> DeploymentResult: ...
 
 
+@overload
+def deploy(
+    *,
+    fastapi_app: FastAPI,
+    api_key: str,
+    base_url: Optional[str] = None,
+    name: Optional[str] = None,
+    auth_config: Optional[AuthConfig] = None,
+    api_version: Literal["05-2025", "latest"] = "latest",
+    timeout: int = 30,
+) -> DeploymentResult: ...
+
+
 def deploy(
     *,
     openapi_spec_path: Annotated[Optional[str], Doc("Path to an OpenAPI specification file (JSON or YAML)")] = None,
@@ -87,6 +105,7 @@ def deploy(
     openapi_spec: Annotated[
         Optional[Union[Dict[str, Any], OpenAPISpec]], Doc("OpenAPI specification as a dictionary or OpenAPISpec object")
     ] = None,
+    fastapi_app: Annotated[Optional[FastAPI], Doc("FastAPI application instance")] = None,
     base_url: Annotated[
         Optional[str],
         Doc("Base URL of the API to proxy requests to. If not provided, will try to extract from the OpenAPI spec"),
@@ -101,7 +120,7 @@ def deploy(
 ) -> DeploymentResult:
     """Deploy a Model Context Protocol (MCP) server from an OpenAPI specification.
 
-    You must provide exactly one of: openapi_spec_path, openapi_spec_url, or openapi_spec.
+    You must provide exactly one of: openapi_spec_path, openapi_spec_url, openapi_spec, or fastapi_app.
 
     Returns:
         A DeploymentResult object containing details of the deployment.
@@ -116,11 +135,13 @@ def deploy(
     logger.info("Deploying MCP server from OpenAPI spec")
 
     # Validate input - must have exactly one openapi_spec source
-    source_count = sum(1 for x in [openapi_spec_path, openapi_spec_url, openapi_spec] if x is not None)
+    source_count = sum(1 for x in [openapi_spec_path, openapi_spec_url, openapi_spec, fastapi_app] if x is not None)
     if source_count == 0:
-        raise ValueError("One of openapi_spec_path, openapi_spec_url, or openapi_spec must be provided")
+        raise ValueError("One of openapi_spec_path, openapi_spec_url, openapi_spec, or fastapi_app must be provided")
     if source_count > 1:
-        raise ValueError("Only one of openapi_spec_path, openapi_spec_url, or openapi_spec should be provided")
+        raise ValueError(
+            "Only one of openapi_spec_path, openapi_spec_url, openapi_spec, or fastapi_app should be provided"
+        )
 
     # Process OpenAPI spec from the provided source
     spec: Optional[OpenAPISpec] = None
@@ -158,6 +179,9 @@ def deploy(
                 details={"url": openapi_spec_url},
                 cause=e,
             )
+    elif fastapi_app is not None:
+        logger.info("Loading OpenAPI spec from FastAPI app")
+        spec = OpenAPISpec.from_fastapi(fastapi_app)
     elif isinstance(openapi_spec, dict):
         logger.info("Using provided OpenAPI spec dictionary")
         spec = OpenAPISpec.from_dict(openapi_spec)
