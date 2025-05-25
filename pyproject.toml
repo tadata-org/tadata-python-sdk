@@ -44,6 +44,8 @@ dev = [
     "djangorestframework>=3.16.0",
     "django-stubs>=5.2.0",
     "djangorestframework-stubs>=3.16.0",
+    "build>=1.2.2.post1",
+    "twine>=6.1.0",
 ]
 
 [project.urls]
