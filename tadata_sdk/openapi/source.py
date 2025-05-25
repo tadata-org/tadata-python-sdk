@@ -186,3 +186,89 @@ class OpenAPISpec(BaseModel):
                 details={"app_title": getattr(app, "title", "Unknown")},
                 cause=e,
             )
+
+    @classmethod
+    def from_django(cls) -> "OpenAPISpec":
+        """Create an OpenAPISpec instance from a Django application.
+
+        This method requires Django REST Framework and drf-spectacular to be installed
+        and properly configured in the Django application.
+
+        Returns:
+            An OpenAPISpec instance.
+
+        Raises:
+            SpecInvalidError: If Django, DRF, or drf-spectacular are not installed,
+                or the OpenAPI specification cannot be extracted.
+        """
+        try:
+            import django
+            from django.conf import settings
+        except ImportError as e:
+            raise SpecInvalidError(
+                "Django is not installed. Please install it with: pip install django",
+                details={"missing_package": "django"},
+                cause=e,
+            )
+
+        try:
+            # Check if Django REST Framework is installed
+            import rest_framework  # noqa: F401
+        except ImportError as e:
+            raise SpecInvalidError(
+                "Django REST Framework is not installed. Please install it with: pip install djangorestframework",
+                details={"missing_package": "djangorestframework"},
+                cause=e,
+            )
+
+        try:
+            # Check if drf-spectacular is installed
+            import drf_spectacular  # noqa: F401
+            from drf_spectacular.openapi import AutoSchema  # noqa: F401
+        except ImportError as e:
+            raise SpecInvalidError(
+                "drf-spectacular is not installed. Please install it with: pip install drf-spectacular",
+                details={"missing_package": "drf-spectacular"},
+                cause=e,
+            )
+
+        try:
+            # Ensure Django is configured
+            if not settings.configured:
+                raise SpecInvalidError(
+                    "Django settings are not configured. Please ensure Django is properly set up.",
+                    details={"django_configured": False},
+                )
+
+            # Check if drf-spectacular is in INSTALLED_APPS
+            if "drf_spectacular" not in settings.INSTALLED_APPS:
+                raise SpecInvalidError(
+                    "drf-spectacular is not in INSTALLED_APPS. Please add 'drf_spectacular' to your INSTALLED_APPS setting.",
+                    details={"missing_app": "drf_spectacular"},
+                )
+
+            # Check if the schema class is configured
+            rest_framework_settings = getattr(settings, "REST_FRAMEWORK", {})
+            schema_class = rest_framework_settings.get("DEFAULT_SCHEMA_CLASS")
+
+            if schema_class != "drf_spectacular.openapi.AutoSchema":
+                raise SpecInvalidError(
+                    "drf-spectacular AutoSchema is not configured. Please set REST_FRAMEWORK['DEFAULT_SCHEMA_CLASS'] = 'drf_spectacular.openapi.AutoSchema'",
+                    details={"current_schema_class": schema_class},
+                )
+
+            # Generate the OpenAPI schema using drf-spectacular
+            # Use the generator directly instead of SpectacularAPIView
+            from drf_spectacular.generators import SchemaGenerator
+
+            generator = SchemaGenerator()
+            schema_dict = generator.get_schema(request=None, public=True)
+
+            return cls.from_dict(schema_dict)
+
+        except Exception as e:
+            raise SpecInvalidError(
+                f"Failed to extract OpenAPI specification from Django app: {str(e)}",
+                details={"django_version": getattr(django, "VERSION", "Unknown")},
+                cause=e,
+            )

@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, Mock
 
 import pytest
 
@@ -228,3 +228,42 @@ def test_deploy_from_fastapi_real_app(mock_api_client, valid_openapi_dict):
 
     except ImportError:
         pytest.skip("FastAPI not available for testing")
+
+
+def test_deploy_from_django(mock_api_client):
+    """Test deploying from Django app."""
+    # Mock the from_django method to return a valid spec
+    with patch("tadata_sdk.openapi.source.OpenAPISpec.from_django") as mock_from_django:
+        from tadata_sdk.openapi.source import OpenAPISpec
+
+        # Create a real OpenAPISpec object
+        mock_spec = OpenAPISpec.from_dict(
+            {"openapi": "3.0.0", "info": {"title": "Test", "version": "1.0.0"}, "paths": {}}
+        )
+        mock_from_django.return_value = mock_spec
+
+        result = deploy(use_django=True, api_key="test-key")
+
+        assert result.id == "test-deployment-id"
+        assert not result.updated
+        mock_from_django.assert_called_once()
+
+
+def test_deploy_from_django_real_app(mock_api_client):
+    """Test deploying from a real Django app configuration."""
+    # Test with actual Django setup but mock the schema generator
+    with patch("drf_spectacular.generators.SchemaGenerator") as mock_generator_class:
+        # Mock the schema generator
+        mock_generator = Mock()
+        mock_generator.get_schema.return_value = {
+            "openapi": "3.0.0",
+            "info": {"title": "Django API", "version": "1.0.0"},
+            "paths": {"/api/test": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        }
+        mock_generator_class.return_value = mock_generator
+
+        result = deploy(use_django=True, api_key="test-key")
+
+        assert result.id == "test-deployment-id"
+        assert not result.updated
+        mock_generator.get_schema.assert_called_once_with(request=None, public=True)

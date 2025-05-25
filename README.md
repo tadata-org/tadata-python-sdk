@@ -66,3 +66,43 @@ print(f"Deployed FastAPI app: {result.id}")
 ```bash
 pip install fastapi
 ```
+
+## Django Support
+
+You can deploy Django REST Framework applications directly using drf-spectacular:
+
+```python
+import os
+import tadata_sdk
+
+# Set up Django environment
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myproject.settings')
+import django
+django.setup()
+
+# Your Django settings should include:
+# INSTALLED_APPS = [
+#     # ... your apps
+#     'rest_framework',
+#     'drf_spectacular',
+# ]
+# REST_FRAMEWORK = {
+#     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+# }
+
+# Deploy using Django schema extraction
+result = tadata_sdk.deploy(
+    use_django=True,  # Extract schema from configured Django application
+    api_key="TADATA_API_KEY",
+    base_url="https://api.myservice.com",
+    name="My Django Deployment"
+)
+
+print(f"Deployed Django app: {result.id}")
+```
+
+**Note:** Django, Django REST Framework, and drf-spectacular are not required dependencies. If you want to use Django support, install them separately:
+
+```bash
+pip install django djangorestframework drf-spectacular
+```
