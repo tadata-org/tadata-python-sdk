@@ -1,11 +1,14 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, TYPE_CHECKING
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..errors.exceptions import SpecInvalidError
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 
 class OpenAPIInfo(BaseModel):
@@ -141,5 +144,45 @@ class OpenAPISpec(BaseModel):
             raise SpecInvalidError(
                 f"Failed to read file: {str(e)}",
                 details={"file_path": str(file_path)},
+                cause=e,
+            )
+
+    @classmethod
+    def from_fastapi(cls, app: "FastAPI") -> "OpenAPISpec":
+        """Create an OpenAPISpec instance from a FastAPI application.
+
+        Args:
+            app: A FastAPI application instance.
+
+        Returns:
+            An OpenAPISpec instance.
+
+        Raises:
+            SpecInvalidError: If FastAPI is not installed, the app is not a FastAPI instance,
+                or the OpenAPI specification cannot be extracted.
+        """
+        try:
+            from fastapi import FastAPI
+        except ImportError as e:
+            raise SpecInvalidError(
+                "FastAPI is not installed. Please install it with: pip install fastapi",
+                details={"missing_package": "fastapi"},
+                cause=e,
+            )
+
+        if not isinstance(app, FastAPI):
+            raise SpecInvalidError(
+                f"Expected a FastAPI instance, got {type(app).__name__}",
+                details={"app_type": type(app).__name__},
+            )
+
+        try:
+            # Get the OpenAPI schema from the FastAPI app
+            openapi_schema = app.openapi()
+            return cls.from_dict(openapi_schema)
+        except Exception as e:
+            raise SpecInvalidError(
+                f"Failed to extract OpenAPI specification from FastAPI app: {str(e)}",
+                details={"app_title": getattr(app, "title", "Unknown")},
                 cause=e,
             )

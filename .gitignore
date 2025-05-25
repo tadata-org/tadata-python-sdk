@@ -179,3 +179,5 @@ node_modules/
 # Task files
 tasks.json
 tasks/
+
+instructions.txt

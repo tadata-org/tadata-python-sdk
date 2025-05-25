@@ -1,5 +1,6 @@
 import json
 import tempfile
+from unittest.mock import Mock, patch
 
 import pytest
 import yaml
@@ -104,3 +105,69 @@ def test_validate_openapi_version():
     with pytest.raises(ValueError) as exc_info:
         OpenAPISpec.validate_openapi_version("2.0.0")
     assert "Only OpenAPI 3.x specifications are supported" in str(exc_info.value)
+
+
+def test_from_fastapi_not_installed():
+    """Test error when FastAPI is not installed."""
+    # Mock the import to raise ImportError
+    with patch("tadata_sdk.openapi.source.OpenAPISpec.from_fastapi") as mock_from_fastapi:
+        mock_from_fastapi.side_effect = SpecInvalidError(
+            "FastAPI is not installed. Please install it with: pip install fastapi",
+            details={"missing_package": "fastapi"},
+        )
+
+        with pytest.raises(SpecInvalidError) as exc_info:
+            OpenAPISpec.from_fastapi(Mock())
+
+        assert "FastAPI is not installed" in str(exc_info.value)
+
+
+def test_from_fastapi_invalid_app():
+    """Test error when a non-FastAPI object is passed."""
+    # Test with a regular object instead of FastAPI app
+    invalid_app = "not a fastapi app"
+
+    with pytest.raises(SpecInvalidError) as exc_info:
+        OpenAPISpec.from_fastapi(invalid_app)
+
+    assert "Expected a FastAPI instance" in str(exc_info.value)
+
+
+def test_from_fastapi_valid_app(valid_openapi_dict):
+    """Test creating an OpenAPISpec from a valid FastAPI app."""
+    try:
+        from fastapi import FastAPI
+
+        # Create a mock FastAPI app
+        app = FastAPI(title="Test API", version="1.0.0")
+
+        # Mock the openapi method to return our test spec
+        app.openapi = Mock(return_value=valid_openapi_dict)
+
+        spec = OpenAPISpec.from_fastapi(app)
+        assert spec.openapi == "3.0.0"
+        assert spec.info.title == "Test API"
+        assert spec.info.version == "1.0.0"
+        assert "/test" in spec.paths
+
+    except ImportError:
+        pytest.skip("FastAPI not available for testing")
+
+
+def test_from_fastapi_app_openapi_error():
+    """Test error when FastAPI app.openapi() raises an exception."""
+    try:
+        from fastapi import FastAPI
+
+        app = FastAPI(title="Test API", version="1.0.0")
+
+        # Mock the openapi method to raise an exception
+        app.openapi = Mock(side_effect=Exception("OpenAPI generation failed"))
+
+        with pytest.raises(SpecInvalidError) as exc_info:
+            OpenAPISpec.from_fastapi(app)
+
+        assert "Failed to extract OpenAPI specification from FastAPI app" in str(exc_info.value)
+
+    except ImportError:
+        pytest.skip("FastAPI not available for testing")
